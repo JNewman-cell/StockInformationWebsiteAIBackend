@@ -50,6 +50,7 @@ class StockAIClient:
             f"{self.base_url}/query",
             json=data
         )
+        response.raise_for_status()  # Raise HTTPError for bad status codes
         return response.json()
 
 
