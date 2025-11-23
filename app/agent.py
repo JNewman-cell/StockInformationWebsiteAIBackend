@@ -80,6 +80,10 @@ class StockAgent:
         Returns:
             Updated agent state
         """
+        # Initialize metadata if not present
+        if "metadata" not in state:
+            state["metadata"] = {}
+            
         system_message = SystemMessage(
             content="You are an expert stock market analyst. Analyze the user's query to understand their intent."
         )

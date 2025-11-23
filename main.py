@@ -28,8 +28,21 @@ async def lifespan(app: FastAPI):
     # Startup
     global stock_agent
     settings = get_settings()
-    stock_agent = StockAgent(settings)
-    print(f"🚀 {settings.app_name} v{settings.app_version} started successfully!")
+    
+    # Validate OpenAI API key
+    if not settings.openai_api_key or settings.openai_api_key == "your_openai_api_key_here":
+        print("⚠️  WARNING: OpenAI API key not configured!")
+        print("   The agent will initialize but API calls will fail.")
+        print("   Please set OPENAI_API_KEY in your .env file.")
+    
+    try:
+        stock_agent = StockAgent(settings)
+        print(f"🚀 {settings.app_name} v{settings.app_version} started successfully!")
+    except Exception as e:
+        print(f"❌ Error initializing agent: {e}")
+        print("   The API will start but agent queries will fail.")
+        stock_agent = None
+    
     yield
     # Shutdown
     print("Shutting down gracefully...")

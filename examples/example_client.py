@@ -139,10 +139,13 @@ def main():
                 print(result['response'])
                 print()
             except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 503:
-                    print("❌ Agent not properly initialized. Check your OpenAI API key.")
+                if hasattr(e, 'response') and e.response is not None:
+                    if e.response.status_code == 503:
+                        print("❌ Agent not properly initialized. Check your OpenAI API key.")
+                    else:
+                        print(f"❌ HTTP Error {e.response.status_code}: {e}")
                 else:
-                    print(f"❌ Error: {e}")
+                    print(f"❌ HTTP Error: {e}")
             except Exception as e:
                 print(f"❌ Error: {e}")
             print()
