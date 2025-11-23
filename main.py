@@ -4,6 +4,7 @@ StockInformationWebsiteAIBackend - Main Application Module
 This is the entry point for the FastAPI application with LangGraph AI agent integration.
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -17,13 +18,31 @@ from app.config import Settings, get_settings
 # Load environment variables
 load_dotenv()
 
+# Initialize agent variable
+stock_agent: Optional[StockAgent] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup
+    global stock_agent
+    settings = get_settings()
+    stock_agent = StockAgent(settings)
+    print(f"🚀 {settings.app_name} v{settings.app_version} started successfully!")
+    yield
+    # Shutdown
+    print("Shutting down gracefully...")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Stock Information Website AI Backend",
     description="A FastAPI backend with LangGraph AI agent for stock information analysis",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -41,13 +60,14 @@ class QueryRequest(BaseModel):
     query: str = Field(..., description="User query about stocks")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context for the query")
     
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "query": "What is the current trend for AAPL stock?",
                 "context": {"timeframe": "1 week"}
             }
         }
+    }
 
 
 class QueryResponse(BaseModel):
@@ -61,19 +81,6 @@ class HealthResponse(BaseModel):
     status: str
     app_name: str
     version: str
-
-
-# Initialize agent (will be created on startup)
-stock_agent: Optional[StockAgent] = None
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the application on startup"""
-    global stock_agent
-    settings = get_settings()
-    stock_agent = StockAgent(settings)
-    print(f"🚀 {settings.app_name} v{settings.app_version} started successfully!")
 
 
 @app.get("/", response_model=HealthResponse)
