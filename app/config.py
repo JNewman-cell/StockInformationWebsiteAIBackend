@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     
+    # CORS Configuration
+    cors_origins: str = "*"  # Comma-separated list of allowed origins
+    
     # OpenAI Configuration
     openai_api_key: str = ""
     
@@ -26,9 +29,10 @@ class Settings(BaseSettings):
     agent_temperature: float = 0.7
     agent_max_tokens: int = 2000
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 
 @lru_cache()
