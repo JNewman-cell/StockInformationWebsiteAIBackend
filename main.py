@@ -2,6 +2,7 @@
 StockInformationWebsiteAIBackend - Main Application Module
 
 This is the entry point for the FastAPI application with LangGraph AI agent integration.
+Includes API layer, service layer, and database layer for authenticated stock analysis.
 """
 
 from contextlib import asynccontextmanager
@@ -14,6 +15,8 @@ from dotenv import load_dotenv
 
 from app.agent import StockAgent
 from app.config import Settings, get_settings
+from app.database import engine, Base
+from app.api.v1 import api_router
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +32,18 @@ async def lifespan(app: FastAPI):
     global stock_agent
     settings = get_settings()
     
+    # Initialize database tables
+    try:
+        if engine:
+            print("📊 Initializing database tables...")
+            Base.metadata.create_all(bind=engine)
+            print("✅ Database tables initialized successfully!")
+        else:
+            print("⚠️  WARNING: Database engine not available. Skipping table initialization.")
+    except Exception as e:
+        print(f"⚠️  WARNING: Database initialization failed: {e}")
+        print("   The API will start but database operations may fail.")
+    
     # Validate OpenAI API key
     if not settings.openai_api_key or settings.openai_api_key == "your_openai_api_key_here":
         print("⚠️  WARNING: OpenAI API key not configured!")
@@ -37,11 +52,13 @@ async def lifespan(app: FastAPI):
     
     try:
         stock_agent = StockAgent(settings)
+        app.state.agent = stock_agent  # Store agent in app state for dependency injection
         print(f"🚀 {settings.app_name} v{settings.app_version} started successfully!")
     except Exception as e:
         print(f"❌ Error initializing agent: {e}")
         print("   The API will start but agent queries will fail.")
         stock_agent = None
+        app.state.agent = None
     
     yield
     # Shutdown
@@ -68,6 +85,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API routers
+app.include_router(api_router)
+
+
+# Dependency to inject agent from app state
+def get_agent_from_state() -> Optional[StockAgent]:
+    """Dependency to get agent from app state"""
+    return getattr(app.state, "agent", None)
 
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
@@ -109,32 +135,36 @@ async def root(settings: Settings = Depends(get_settings)):
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health_check(settings: Settings = Depends(get_settings)):
-    """Health check endpoint"""
-    return HealthResponse(
-        status="healthy",
-        app_name=settings.app_name,
-        version=settings.app_version
-    )
-
-
 @app.post("/query", response_model=QueryResponse)
 async def query_agent(
     request: QueryRequest,
+    agent: Optional[StockAgent] = Depends(get_agent_from_state),
     settings: Settings = Depends(get_settings)
 ):
     """
     Query the AI agent with a question about stocks.
     
     The agent uses LangGraph to process queries and provide intelligent responses.
+    
+    **Note**: This is a public endpoint. For authenticated analysis endpoints,
+    use the /api/v1/analyze routes.
     """
-    if stock_agent is None:
+    if agent is None:
         raise HTTPException(status_code=503, detail="Agent not initialized")
     
     try:
-        response = await stock_agent.process_query(
+        response = await agent.process_query(
             query=request.query,
             context=request.context
+        )
+        return QueryResponse(
+            response=response["response"],
+            metadata=response.get("metadata")
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing query: {str(e)}"
         )
         return QueryResponse(
             response=response["response"],

@@ -4,6 +4,7 @@ Configuration management using Pydantic Settings
 
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -23,6 +24,15 @@ class Settings(BaseSettings):
     
     # OpenAI Configuration
     openai_api_key: str = ""
+    
+    # Database Configuration (Optional)
+    database_url: Optional[str] = None
+    
+    # JWT Authentication Configuration (for validating tokens from frontend)
+    neon_auth_issuer_uri: Optional[str] = None
+    stack_jwks_url: Optional[str] = None
+    jwt_algorithm: str = "RS256"
+    jwt_issuer: str = "https://api.stack-auth.com"
     
     # Agent Configuration
     agent_model: str = "gpt-4-turbo-preview"

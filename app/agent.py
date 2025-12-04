@@ -46,44 +46,27 @@ class StockAgent:
         self,
         query: str,
         context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    ) -> str:
         """
         Process a user query through the agent workflow.
-        
-        The query passes through three nodes:
-        1. understand_query: Analyzes user intent
-        2. process_query: Generates detailed analysis
-        3. generate_response: Synthesizes final response
         
         Args:
             query: User's question about stocks
             context: Optional additional context (e.g., {"timeframe": "1 week"})
             
         Returns:
-            Dict containing:
-                - response: The agent's answer to the query
-                - metadata: Processing information (understanding, analysis, etc.)
+            The agent's response string
         """
-        # Initialize the agent state
-        initial_state: Dict[str, Any] = {
-            "messages": [],
-            "query": query,
-            "context": context,
-            "response": "",
-            "metadata": {
-                "query": query,
-                "context": context
-            }
-        }
+        # For now, just use the LLM directly without graph
+        from langchain_core.messages import HumanMessage
         
-        # Execute the graph workflow
-        final_state = await self.graph.ainvoke(initial_state)
+        # Create a simple prompt
+        prompt = f"You are a stock market analyst. {query}"
         
-        # Return the response and metadata
-        return {
-            "response": final_state["response"],
-            "metadata": final_state["metadata"]
-        }
+        # Call the LLM
+        response = await self.llm_client.invoke([HumanMessage(content=prompt)])
+        
+        return response.content
     
     def get_graph_structure(self) -> Dict[str, Any]:
         """

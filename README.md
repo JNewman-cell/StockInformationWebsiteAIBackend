@@ -53,10 +53,31 @@ APP_NAME=StockInformationWebsiteAIBackend
 DEBUG=True
 HOST=0.0.0.0
 PORT=8000
+
+# Database Configuration (Optional - for authenticated API endpoints)
+# Update with your Neon PostgreSQL credentials if using database features
+DATABASE_URL=postgresql://username:password@your-neon-host.neon.tech/your_db?sslmode=require
+
+# JWT Configuration (Optional - for authenticated endpoints)
+JWT_SECRET=your_jwt_secret_here
+JWT_ALGORITHM=HS256
+JWT_ISSUER=https://neon.tech
+
 AGENT_MODEL=gpt-4-turbo-preview
 AGENT_TEMPERATURE=0.7
 AGENT_MAX_TOKENS=2000
 ```
+
+### Database Setup (Optional)
+
+If you want to use authenticated API endpoints and database features:
+
+1. **Get your Neon database credentials** from https://console.neon.tech
+2. **Update `DATABASE_URL`** in your `.env` file with your actual credentials:
+   ```env
+   DATABASE_URL=postgresql://username:password@ep-xxxxx.us-west-2.aws.neon.tech/dbname?sslmode=require
+   ```
+3. The application will automatically create the necessary tables on startup
 
 ## 🚀 Running the Application
 
@@ -201,25 +222,45 @@ The AI agent uses a state graph with three main nodes:
 
 ## 🧪 Testing
 
-You can test the API using curl:
+You can test the API using curl or the interactive Swagger UI:
+
+### Using Swagger UI (Recommended)
+1. Start the application: `python main.py`
+2. Open http://localhost:8000/docs in your browser
+3. Try out endpoints directly from the web interface
+
+### Using curl
 
 ```bash
 # Health check
 curl http://localhost:8000/health
 
-# Query the agent
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What is the current trend for AAPL stock?",
-    "context": {"timeframe": "1 week"}
-  }'
+# Query the agent (public endpoint)
+curl -X POST http://localhost:8000/query ^
+  -H "Content-Type: application/json" ^
+  -d "{\"query\": \"What is the current trend for AAPL stock?\", \"context\": {\"timeframe\": \"1 week\"}}"
 
 # Get agent info
 curl http://localhost:8000/agent/info
 ```
 
-Or use the interactive Swagger UI at http://localhost:8000/docs
+**Note for Windows `cmd.exe`**: Replace `\` with `^` for line continuation in the curl command above.
+
+### Authenticated Endpoints (with Database)
+
+If you've configured a database, you can test authenticated endpoints:
+
+```bash
+# Analyze stock price action (requires JWT token)
+curl -X POST http://localhost:8000/api/v1/analyze/price-action ^
+  -H "Content-Type: application/json" ^
+  -H "x-stack-access-token: your_jwt_token_here" ^
+  -d "{\"ticker\": \"AAPL\", \"additional_context\": \"Last 30 days\"}"
+
+# Get user stats (requires JWT token)
+curl http://localhost:8000/api/v1/users/me/stats ^
+  -H "x-stack-access-token: your_jwt_token_here"
+```
 
 ## 🔒 Security Considerations
 
