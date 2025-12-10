@@ -3,7 +3,7 @@ OpenAI LLM client wrapper for centralized API communication management
 """
 
 from langchain_openai import ChatOpenAI
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from app.config import Settings
 
 
@@ -44,11 +44,10 @@ class OpenAIClient:
         return ChatOpenAI(
             model=self.settings.agent_model,
             temperature=self.settings.agent_temperature,
-            max_tokens=self.settings.agent_max_tokens,
-            openai_api_key=self.settings.openai_api_key
+            max_completion_tokens=self.settings.agent_max_tokens
         )
     
-    async def invoke(self, messages: list) -> Any:
+    async def invoke(self, messages: list[Any]) -> Any:
         """
         Invoke the LLM with messages.
         

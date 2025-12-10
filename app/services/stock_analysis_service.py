@@ -4,11 +4,14 @@ Stock analysis service for AI-powered stock analysis operations.
 
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
-from datetime import datetime
-import json
 
-from app.database.models import ApiUsage, User
 from app.agent import StockAgent
+from app.database.models import TickerSummary
+
+
+class TickerNotFoundException(Exception):
+    """Exception raised when a ticker is not found in the database."""
+    pass
 
 
 class StockAnalysisService:
@@ -32,6 +35,12 @@ class StockAnalysisService:
         """
         Analyze price action for a given ticker using the AI agent.
         
+        The workflow:
+        1. Validates ticker exists in ticker_summary table
+        2. Checks if analysis exists and is fresh (from today)
+        3. If cached → returns cached result with 200 status
+        4. If not cached or stale → runs new analysis and saves to database
+        
         Args:
             ticker: Stock ticker symbol (e.g., "AAPL")
             user_id: ID of the user making the request
@@ -40,60 +49,38 @@ class StockAnalysisService:
             user_name: Optional name of the user
             
         Returns:
-            Dictionary containing the analysis results
+            Dictionary containing the analysis results with ticker, analysis, and timestamp
+            
+        Raises:
+            TickerNotFoundException: If ticker is not found in ticker_summary table
         """
-        # Construct the query for the AI agent
-        query = f"Summarize the price action for {ticker}"
-        if additional_context:
-            query += f". Additional context: {additional_context}"
+        # Validate ticker exists in the database
+        ticker_upper = ticker.upper()
+        ticker_exists = self.db.query(TickerSummary).filter(
+            TickerSummary.ticker == ticker_upper
+        ).first()
+        
+        if not ticker_exists:
+            raise TickerNotFoundException(f"Ticker '{ticker_upper}' not found in database")
         
         try:
-            # Call the AI agent
-            analysis = await self.agent.process_query(query)
+            # Call the AI agent's analyze method with database integration
+            result = await self.agent.analyze_ticker_price_action(
+                ticker=ticker,
+                context={"user_id": user_id, "additional_context": additional_context}
+            )
+            
+            # Check for errors
+            if result.get("status_code") == 500:
+                raise Exception(result.get("error", "Unknown error"))
             
             return {
                 "ticker": ticker.upper(),
-                "analysis": analysis,
-                "timestamp": datetime.utcnow().isoformat()
+                "analysis": result.get("analysis_result", ""),
+                "timestamp": result.get("updated_at") or None,
+                "from_cache": result.get("from_cache", False)
             }
             
         except Exception as e:
             print(f"❌ Agent error: {type(e).__name__}: {str(e)}")
             raise e
-    
-    def get_user_usage_stats(self, user_id: str, limit: int = 10) -> Dict[str, Any]:
-        """
-        Get usage statistics for a user.
-        
-        Args:
-            user_id: User identifier
-            limit: Number of recent requests to return
-            
-        Returns:
-            Dictionary with usage statistics
-        """
-        # Get total request count
-        total_requests = self.db.query(ApiUsage).filter(
-            ApiUsage.user_id == user_id
-        ).count()
-        
-        # Get recent requests
-        recent_requests = self.db.query(ApiUsage).filter(
-            ApiUsage.user_id == user_id
-        ).order_by(
-            ApiUsage.created_at.desc()
-        ).limit(limit).all()
-        
-        return {
-            "user_id": user_id,
-            "total_requests": total_requests,
-            "recent_requests": [
-                {
-                    "endpoint": req.endpoint,
-                    "ticker": req.ticker,
-                    "status": req.response_status,
-                    "timestamp": req.created_at.isoformat()
-                }
-                for req in recent_requests
-            ]
-        }

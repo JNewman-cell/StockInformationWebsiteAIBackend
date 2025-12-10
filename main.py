@@ -9,13 +9,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-import os
+from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
 from app.agent import StockAgent
 from app.config import Settings, get_settings
-from app.database import engine, Base
+from app.database import engine, Base, get_db
 from app.api.v1 import api_router
 
 # Load environment variables
@@ -51,9 +50,15 @@ async def lifespan(app: FastAPI):
         print("   Please set OPENAI_API_KEY in your .env file.")
     
     try:
-        stock_agent = StockAgent(settings)
-        app.state.agent = stock_agent  # Store agent in app state for dependency injection
-        print(f"🚀 {settings.app_name} v{settings.app_version} started successfully!")
+        # Create a database session for the agent
+        db_generator = get_db()
+        db_session = next(db_generator)
+        if db_session is not None:
+            stock_agent = StockAgent(settings, db_session)
+            app.state.agent = stock_agent  # Store agent in app state for dependency injection
+            print(f"🚀 {settings.app_name} v{settings.app_version} started successfully!")
+        else:
+            raise ValueError("Database session could not be created")
     except Exception as e:
         print(f"❌ Error initializing agent: {e}")
         print("   The API will start but agent queries will fail.")
@@ -157,18 +162,10 @@ async def query_agent(
             query=request.query,
             context=request.context
         )
+        # process_query returns a string
         return QueryResponse(
-            response=response["response"],
-            metadata=response.get("metadata")
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing query: {str(e)}"
-        )
-        return QueryResponse(
-            response=response["response"],
-            metadata=response.get("metadata")
+            response=response,
+            metadata=None
         )
     except Exception as e:
         raise HTTPException(
@@ -178,7 +175,7 @@ async def query_agent(
 
 
 @app.get("/agent/info")
-async def agent_info(settings: Settings = Depends(get_settings)):
+async def agent_info(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
     """Get information about the AI agent configuration"""
     return {
         "model": settings.agent_model,

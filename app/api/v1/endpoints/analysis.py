@@ -2,13 +2,14 @@
 Analysis endpoints for stock price action analysis.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
 from app.database import get_db
 from app.services import StockAnalysisService
+from app.services.stock_analysis_service import TickerNotFoundException
 from app.api.middleware.auth import get_current_user
 from app.agent import StockAgent
 
@@ -20,23 +21,17 @@ def get_agent_from_request(request: Request) -> Optional[StockAgent]:
     return getattr(request.app.state, "agent", None)
 
 
-class PriceActionRequest(BaseModel):
-    """Request model for price action analysis."""
-    additional_context: Optional[str] = Field(None, description="Additional context for analysis")
-
-
 class PriceActionResponse(BaseModel):
     """Response model for price action analysis."""
     ticker: str
     analysis: str
-    timestamp: str
+    timestamp: Optional[str] = None
 
 
 @router.post("/{ticker}/price-action-analysis", response_model=PriceActionResponse, status_code=status.HTTP_200_OK)
 async def analyze_price_action(
     ticker: str,
-    request: PriceActionRequest = Body(default=PriceActionRequest()),
-    current_user: dict = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db),
     agent: Optional[StockAgent] = Depends(get_agent_from_request)
 ):
@@ -69,15 +64,25 @@ async def analyze_price_action(
     
     try:
         service = StockAnalysisService(db=db, agent=agent)
+        user_id: str = str(current_user.get("user_id", ""))
+        user_email: Optional[str] = current_user.get("email")  # type: ignore[assignment]
+        user_name: Optional[str] = current_user.get("username")  # type: ignore[assignment]
+        
         result = await service.analyze_ticker_price_action(
             ticker=ticker,
-            user_id=current_user["user_id"],
-            additional_context=request.additional_context,
-            user_email=current_user.get("email"),
-            user_name=current_user.get("username")
+            user_id=user_id,
+            additional_context=None,
+            user_email=user_email,
+            user_name=user_name
         )
         
         return PriceActionResponse(**result)
+    
+    except TickerNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
         
     except Exception as e:
         print(f"❌ Error in price action analysis: {type(e).__name__}: {str(e)}")

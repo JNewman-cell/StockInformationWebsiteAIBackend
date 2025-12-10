@@ -2,6 +2,7 @@
 Endpoints package initialization.
 """
 
-from . import analysis, users
+from . import analysis
 
-__all__ = ["analysis", "users"]
+__all__ = ["analysis"]
+

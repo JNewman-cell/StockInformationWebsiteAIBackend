@@ -3,8 +3,8 @@ First node: Query Understanding
 Analyzes user's query to understand intent and context
 """
 
-from typing import Dict, Any
-from langchain_core.messages import SystemMessage, HumanMessage
+from typing import Dict, Any, List
+from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
 from app.llm import OpenAIClient
 
 
@@ -34,7 +34,7 @@ async def understand_query_node(
     )
     
     human_message = HumanMessage(content=state["query"])
-    messages = [system_message, human_message]
+    messages: List[BaseMessage] = [system_message, human_message]
     
     # Call OpenAI API through client
     response = await llm_client.invoke(messages)
