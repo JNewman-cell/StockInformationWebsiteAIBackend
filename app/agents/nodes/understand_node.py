@@ -5,7 +5,7 @@ Analyzes user's query to understand intent and context
 
 from typing import Dict, Any, List
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
-from app.llm import OpenAIClient
+from app.agents.openai_client import OpenAIClient
 
 
 async def understand_query_node(

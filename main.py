@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
-from app.agent import StockAgent
+from app.agents.stock_news_analysis_agent import StockAgent
 from app.config import Settings, get_settings
 from app.database import engine, Base, get_db
 from app.api.v1 import api_router

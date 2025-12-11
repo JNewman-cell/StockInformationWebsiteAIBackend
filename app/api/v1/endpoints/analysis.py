@@ -11,7 +11,7 @@ from app.database import get_db
 from app.services import StockAnalysisService
 from app.services.stock_analysis_service import TickerNotFoundException
 from app.api.middleware.auth import get_current_user
-from app.agent import StockAgent
+from app.agents.stock_news_analysis_agent import StockAgent
 
 router = APIRouter()
 

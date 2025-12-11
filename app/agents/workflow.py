@@ -5,8 +5,8 @@ LangGraph workflow definition and graph construction
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from sqlalchemy.orm import Session
-from app.llm import OpenAIClient
-from app.graph.nodes import (
+from app.agents.openai_client import OpenAIClient
+from app.agents.nodes import (
     check_ticker_analysis_node,
     understand_query_node,
     process_query_node,

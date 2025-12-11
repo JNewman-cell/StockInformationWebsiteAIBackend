@@ -8,9 +8,9 @@ for processing stock-related queries using OpenAI API.
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from app.config import Settings
-from app.llm import OpenAIClient
-from app.graph import create_agent_graph, AgentState
-from app.graph.workflow import get_graph_structure
+from app.agents.openai_client import OpenAIClient
+from app.agents import create_agent_graph, AgentState
+from app.agents.workflow import get_graph_structure
 
 
 class StockAgent:

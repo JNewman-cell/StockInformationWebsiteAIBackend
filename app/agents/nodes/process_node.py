@@ -5,7 +5,7 @@ Processes the query with provided context
 
 from typing import Dict, Any
 from langchain_core.messages import HumanMessage
-from app.llm import OpenAIClient
+from app.agents.openai_client import OpenAIClient
 
 
 async def process_query_node(

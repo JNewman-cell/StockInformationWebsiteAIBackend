@@ -5,7 +5,7 @@ Stock analysis service for AI-powered stock analysis operations.
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 
-from app.agent import StockAgent
+from app.agents.stock_news_analysis_agent import StockAgent
 from app.database.models import TickerSummary
 
 

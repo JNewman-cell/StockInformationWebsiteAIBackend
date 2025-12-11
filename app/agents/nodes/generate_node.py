@@ -5,7 +5,7 @@ Generates the final user-facing response
 
 from typing import Dict, Any
 from langchain_core.messages import HumanMessage
-from app.llm import OpenAIClient
+from app.agents.openai_client import OpenAIClient
 
 
 async def generate_response_node(
