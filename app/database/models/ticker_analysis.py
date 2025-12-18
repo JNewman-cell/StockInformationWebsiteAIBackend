@@ -19,6 +19,9 @@ class TickerPriceActionAnalysis(Base):
     ticker = Column(String(7), ForeignKey("ticker_summary.ticker"), primary_key=True, nullable=False, index=True)
     analysis_result = Column(Text, nullable=False)
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), nullable=False)
+    progress_messages = Column(Text, nullable=True)
+    status = Column(Text, nullable=True)
+    current_step = Column(Text, nullable=True)
     
     def __repr__(self):
         return f"<TickerPriceActionAnalysis(ticker={self.ticker}, updated_at={self.updated_at})>"

@@ -24,11 +24,29 @@ def get_agent_from_request(request: Request) -> Optional[StockAgent]:
 class PriceActionResponse(BaseModel):
     """Response model for price action analysis."""
     ticker: str
-    analysis: str
+    analysis: Optional[str] = None
+    summary: Optional[str] = None
     timestamp: Optional[str] = None
+    from_cache: bool = False
+    workflow_id: Optional[str] = None
+    status: Optional[str] = None
+    message: Optional[str] = None
 
 
-@router.post("/{ticker}/price-action-analysis", response_model=PriceActionResponse, status_code=status.HTTP_200_OK)
+class WorkflowStatusResponse(BaseModel):
+    """Response model for workflow status checks."""
+    workflow_id: str
+    ticker: str
+    status: str  # running, completed, failed
+    current_step: str
+    started_at: str
+    completed_at: Optional[str] = None
+    progress_message: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+@router.post("/{ticker}/price-action-analysis", status_code=status.HTTP_200_OK)
 async def analyze_price_action(
     ticker: str,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -41,20 +59,30 @@ async def analyze_price_action(
     This endpoint uses an AI agent to provide insights on price movements,
     trends, and key technical indicators for the specified ticker.
     
+    **Returns:**
+    - 200 OK with cached analysis: Returns complete analysis from cache (within last 30 minutes)
+    - 200 OK with workflow_id: Workflow started, use workflow status endpoint to track progress
+    - 404 Not Found: Ticker not found in database
+    - 503 Service Unavailable: AI agent not available
+    
+    **Response Types:**
+    - Cached: {"ticker": "AAPL", "analysis": "...", "summary": "...", "from_cache": true}
+    - Started: {"ticker": "AAPL", "workflow_id": "uuid", "status": "running", "from_cache": false}
+    
     **Authentication Required**: Bearer token must be provided in the
     `x-stack-access-token` header or `Authorization: Bearer <token>` header.
     
     Args:
-        request: Request body containing ticker and optional context
+        ticker: Stock ticker symbol
         current_user: Authenticated user information (injected by middleware)
         db: Database session (injected)
         agent: AI agent instance (injected from app state)
         
     Returns:
-        Analysis results with ticker, analysis text, and timestamp
+        Either cached analysis or workflow_id to track progress
         
     Raises:
-        HTTPException: 401 if not authenticated, 500 if analysis fails
+        HTTPException: 404 if ticker not found, 503 if agent unavailable
     """
     if not agent:
         raise HTTPException(
@@ -71,14 +99,14 @@ async def analyze_price_action(
         result = await service.analyze_ticker_price_action(
             ticker=ticker,
             user_id=user_id,
-            additional_context=None,
-            user_email=user_email,
-            user_name=user_name
+            additional_context=None
         )
         
+        # Return 200 with either cached result or workflow_id
         return PriceActionResponse(**result)
     
     except TickerNotFoundException as e:
+        # Return 404 if ticker not found
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
@@ -92,3 +120,52 @@ async def analyze_price_action(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to analyze ticker: {str(e)}"
         )
+
+
+@router.get("/workflow/{workflow_id}/status", response_model=WorkflowStatusResponse, status_code=status.HTTP_200_OK)
+async def get_workflow_status(
+    workflow_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Get the current status of a running analysis workflow.
+    
+    This endpoint is designed to be polled by websockets or frontend clients
+    to track the progress of an analysis workflow.
+    
+    **Workflow States:**
+    - running: Workflow is currently executing (check current_step for details)
+    - completed: Workflow finished successfully (result field contains analysis)
+    - failed: Workflow encountered an error (error field contains details)
+    
+    **Current Steps:**
+    - initializing: Workflow has been created
+    - collecting_news: Fetching and analyzing news from sources
+    - completed: All steps finished
+    - error: Workflow failed
+    
+    **Usage Pattern:**
+    1. Start analysis with POST /{ticker}/price-action-analysis
+    2. Receive workflow_id in response
+    3. Poll this endpoint with workflow_id to track progress
+    4. When status="completed", extract result field for final analysis
+    
+    Args:
+        workflow_id: Unique workflow identifier returned from analysis endpoint
+        current_user: Authenticated user information (injected by middleware)
+        
+    Returns:
+        Current workflow status with progress information
+        
+    Raises:
+        HTTPException: 404 if workflow not found
+    """
+    workflow_status = StockAnalysisService.get_workflow_status(workflow_id)
+    
+    if not workflow_status:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workflow '{workflow_id}' not found. It may have expired or been cleaned up."
+        )
+    
+    return WorkflowStatusResponse(workflow_id=workflow_id, **workflow_status)

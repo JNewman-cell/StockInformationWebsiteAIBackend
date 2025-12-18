@@ -26,8 +26,14 @@ async def save_analysis_node(
     Returns:
         Updated agent state with save status
     """
+    # Update progress immediately at start
+    state["current_step"] = "saving_analysis"
+    state["progress_message"] = "Saving analysis to database"
+    
     ticker = state.get("ticker", "").upper()
     analysis_result = state.get("response", "")
+    current_step = state.get("current_step", "completed")
+    progress_message = state.get("progress_message", "")
     
     if not ticker or not analysis_result:
         state["metadata"]["save_status"] = "Failed - Missing ticker or analysis result"
@@ -41,19 +47,26 @@ async def save_analysis_node(
         
         if existing_record:
             existing_record.analysis_result = analysis_result
+            existing_record.current_step = current_step
+            existing_record.progress_messages = progress_message
+            existing_record.status = "completed"
             # Note: updated_at will be automatically updated by server_default=func.now()
-            # but we can still update it manually if needed
             db.merge(existing_record)
         else:
             # Create new record (updated_at will be set automatically)
             new_record = TickerPriceActionAnalysis(
                 ticker=ticker,
-                analysis_result=analysis_result
+                analysis_result=analysis_result,
+                current_step=current_step,
+                progress_messages=progress_message,
+                status="completed"
             )
             db.add(new_record)
         
         db.commit()
         state["metadata"]["save_status"] = f"Successfully saved analysis for {ticker}"
+        state["progress_message"] = f"Analysis saved successfully for {ticker}"
+        state["current_step"] = "completed"
         
     except SQLAlchemyError as e:
         db.rollback()

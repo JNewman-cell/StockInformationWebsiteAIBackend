@@ -36,3 +36,9 @@ typing-extensions~=4.9
 
 # Optional: For enhanced capabilities
 tiktoken~=0.12
+
+# Stock data retrieval  
+git+https://github.com/JNewman-cell/yahooquery.git@v2.4.3
+
+# Article text extraction
+trafilatura~=1.6

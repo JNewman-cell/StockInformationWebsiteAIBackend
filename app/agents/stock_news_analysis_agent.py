@@ -50,22 +50,21 @@ class StockAgent:
     async def analyze_ticker_price_action(
         self,
         ticker: str,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        workflow_id: Optional[str] = None,
+        progress_callback: Optional[callable] = None
     ) -> Dict[str, Any]:
         """
         Analyze price action for a ticker through the agent workflow.
         
-        The workflow:
-        1. Checks if analysis exists and is fresh (from today)
-        2. If cached → returns cached result with 200 status
-        3. If not cached or stale → runs new analysis and saves to database
-        
         Args:
             ticker: Stock ticker symbol (e.g., "AAPL")
             context: Optional additional context for the analysis
+            workflow_id: Optional workflow ID for progress tracking
+            progress_callback: Optional callback function for progress updates
             
         Returns:
-            Dict with analysis_result, updated_at, and should_analyze flag
+            Dict with analysis_result, updated_at, and progress info
         """
         # Initialize state for the graph
         state = {
@@ -77,30 +76,42 @@ class StockAgent:
             "messages": [],
             "context": context or {},
             "metadata": {},
-            "error": None
+            "error": None,
+            "current_step": "initializing",
+            "progress_message": ""
         }
         
-        # Execute the workflow
+        # Execute the workflow (cache is checked in service layer)
         try:
-            result = await self.graph.ainvoke(state)
+            # Create config with thread_id for checkpointing
+            config = {"configurable": {"thread_id": ticker.upper()}}
             
-            # If cached analysis was used
-            if result.get("cached_analysis"):
-                return {
-                    "analysis_result": result["cached_analysis"]["analysis_result"],
-                    "updated_at": result["cached_analysis"]["updated_at"],
-                    "from_cache": True,
-                    "status_code": 200
-                }
+            # Stream through workflow states if callback provided
+            if progress_callback and workflow_id:
+                final_state = None
+                async for event in self.graph.astream(state, config=config):
+                    # Extract state from event
+                    for node_name, node_state in event.items():
+                        if isinstance(node_state, dict):
+                            current_step = node_state.get("current_step", "unknown")
+                            message = node_state.get("progress_message", "")
+                            print(f"📊 Node: {node_name}, Step: {current_step}, Message: {message}")
+                            progress_callback(workflow_id, current_step, message)
+                            final_state = node_state
+                
+                # Use final state from streaming
+                result = final_state if final_state else state
+            else:
+                result = await self.graph.ainvoke(state, config=config)
             
-            # If new analysis was run and saved
-            if result.get("response"):
-                return {
-                    "analysis_result": result["response"],
-                    "updated_at": result.get("metadata", {}).get("analysis_time"),
-                    "from_cache": False,
-                    "status_code": 200
-                }
+            # Workflow always runs new analysis (cache checked in service)
+            return {
+                "analysis_result": result.get("response", ""),
+                "news_summary": result.get("news_summary"),
+                "updated_at": result.get("metadata", {}).get("analysis_time"),
+                "from_cache": False,
+                "status_code": 200
+            }
             
             # Error case
             if result.get("error"):

@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     openai_api_key: str = ""
     
+    # Financial Modeling Prep API Configuration
+    fmp_api_key: str = ""
+    
     # Database Configuration (Optional)
     database_url: Optional[str] = None
     

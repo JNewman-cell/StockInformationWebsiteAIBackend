@@ -21,6 +21,11 @@ class AgentState(dict):
     - response: Final response to user
     - metadata: Tracking information for debugging/logging
     - error: Any error messages
+    - news_data: Collected news articles from ticker, indices, and peers
+    - price_action_data: Price movements for ticker, indices, and peers
+    - significance_analysis: LLM analysis of price movement significance
+    - peers: List of peer ticker symbols
+    - news_summary: LLM-generated summary of significant news articles
     """
     
     def __init__(self):
@@ -34,7 +39,15 @@ class AgentState(dict):
             "context": None,
             "response": "",
             "metadata": {},
-            "error": None
+            "error": None,
+            "news_data": {},
+            "price_action_data": {},
+            "significance_analysis": None,
+            "all_analyses": {},
+            "peers": [],
+            "news_summary": None,
+            "current_step": "initializing",
+            "progress_message": ""
         })
 
 
@@ -52,4 +65,12 @@ class AgentStateDict(TypedDict):
     response: str
     metadata: Dict[str, Any]
     error: Optional[str]
+    news_data: Dict[str, Any]
+    price_action_data: Dict[str, Any]
+    significance_analysis: Optional[Dict[str, Any]]
+    all_analyses: Dict[str, Dict[str, Any]]
+    peers: list[str]
+    news_summary: Optional[str]
+    current_step: str
+    progress_message: str
 
